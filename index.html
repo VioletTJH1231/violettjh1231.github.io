@@ -61,15 +61,9 @@
         // For this single HTML file to demonstrate PWA features, it's included here.
         // Be aware of Service Worker scope limitations when embedded this way.
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/service-worker.js') // Point to a separate file for production
-                    .then(registration => {
-                        console.log('Service Worker registered with scope:', registration.scope);
-                    })
-                    .catch(error => {
-                        console.error('Service Worker registration failed:', error);
-                    });
-            });
+        navigator.serviceWorker.register('/service-worker.js')
+            .then(reg => console.log('SW 注册成功'))
+            .catch(err => console.error('SW 注册失败', err));
         }
     </script>
 
