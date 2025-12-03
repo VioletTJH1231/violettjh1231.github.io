@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#007AFF" />
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- iOS Specific Meta Tags for PWA -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="习惯追踪" />
+
+    <!-- iOS Icons - Replace with your actual paths and sizes -->
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png" sizes="192x192" />
+    <link rel="apple-touch-icon" href="/icons/icon-512x512.png" sizes="512x512" />
+
+    <title>我的习惯追踪器</title>
+
+    <!-- Tailwind CSS CDN (for development/single file demo - in production, you'd bundle it) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Add any custom CSS here if needed, or if Tailwind classes don't cover everything */
+        body {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        /* Ensure safe area for iPhone notches */
+        .pb-safe { padding-bottom: constant(safe-area-inset-bottom); padding-bottom: env(safe-area-inset-bottom); }
+        .pt-safe { padding-top: constant(safe-area-inset-top); padding-top: env(safe-area-inset-top); }
+        .pl-safe { padding-left: constant(safe-area-inset-left); padding-left: env(safe-area-inset-left); }
+        .pr-safe { padding-right: constant(safe-area-inset-right); padding-right: env(safe-area-inset-right); }
+
+        /* Custom styles for the app's overall look if needed beyond Tailwind */
+        #root {
+            min-height: 100vh; /* Ensure the root element spans the full viewport height */
+        }
+    </style>
+</head>
+<body>
+    <noscript>你需要启用 JavaScript 才能运行这个应用。</noscript>
+    <div id="root"></div>
+
+    <!-- PWA Manifest JSON (for convenience, normally a separate file) -->
+    <script id="manifest-data" type="application/json">
+        {
+            "short_name": "习惯追踪",
+            "name": "我的习惯追踪器",
+            "icons": [
+                {
+                    "src": "/icons/icon-192x192.png",
+                    "type": "image/png",
+                    "sizes": "192x192"
+                },
+                {
+                    "src": "/icons/icon-512x512.png",
+                    "type": "image/png",
+                    "sizes": "512x512"
+                }
+            ],
+            "start_url": ".",
+            "display": "standalone",
+            "theme_color": "#007AFF",
+            "background_color": "#F2F2F7"
+        }
+    </script>
+    <script>
+        // Dynamically create manifest.json for testing purposes
+        // In a real build, this would be a static file.
+        const manifestData = JSON.parse(document.getElementById('manifest-data').textContent);
+        const manifestBlob = new Blob([JSON.stringify(manifestData)], {type : 'application/json'});
+        const manifestUrl = URL.createObjectURL(manifestBlob);
+        document.querySelector('link[rel="manifest"]').setAttribute('href', manifestUrl);
+    </script>
+
+    <script type="module">
+        import React, { useState, useEffect, useMemo, useCallback } from 'https://esm.sh/react@18.2.0';
+        import ReactDOM from 'https://esm.sh/react-dom@18.2.0/client';
+        // Lucide React Icons - directly importing from ESM CDN
+        // You might need to list all used icons or import a bundle if ESM.sh doesn't handle individual imports well
+        import { 
+          Plus, Check, X, BarChart2, Calendar, Settings, 
+          ChevronRight, ChevronLeft, Trash2, Download, Smartphone, 
+          Edit3, BookOpen, Activity, Zap, Award, Flame, Menu, Minus
+        } from 'https://esm.sh/lucide-react@0.320.0';
+
+        // --- PWA Service Worker Registration (Inline for this demo) ---
+        // In a real app, this would be in a separate service-worker.js file.
+        // For this single HTML file to demonstrate PWA features, it's included here.
+        // Be aware of Service Worker scope limitations when embedded this way.
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js') // Point to a separate file for production
+                    .then(registration => {
+                        console.log('Service Worker registered with scope:', registration.scope);
+                    })
+                    .catch(error => {
+                        console.error('Service Worker registration failed:', error);
+                    });
+            });
+        }
+    </script>
+
+    <script type="text/javascript">
+        // In a real React app, your compiled JS bundle would go here.
+        // For this single-file demo, we'll re-include the React code as a template string.
+        // This is NOT how you'd normally deploy a React app.
+        // It's a hack to get a working example in one HTML file.
+
+        const COLORS = [
+          { name: 'blue', hex: '#007AFF', bg: 'bg-blue-500', text: 'text-blue-500', light: 'bg-blue-100', ring: 'ring-blue-500' },
+          { name: 'green', hex: '#34C759', bg: 'bg-green-500', text: 'text-green-500', light: 'bg-green-500', ring: 'ring-green-500' },
+          { name: 'orange', hex: '#FF9500', bg: 'bg-orange-500', text: 'text-orange-500', light: 'bg-orange-500', ring: 'ring-orange-500' },
+          { name: 'red', hex: '#FF3B30', bg: 'bg-red-500', text: 'text-red-500', light: 'bg-red-500', ring: 'ring-red-500' },
+          { name: 'purple', hex: '#AF52DE', bg: 'bg-purple-500', text: 'text-purple-500', light: 'bg-purple-500', ring: 'ring-purple-500' },
+          { name: 'pink', hex: '#FF2D55', bg: 'bg-pink-500', text: 'text-pink-500', light: 'bg-pink-500', ring: 'ring-pink-500' },
+          { name: 'indigo', hex: '#5856D6', bg: 'bg-indigo-500', text: 'text-indigo-500', light: 'bg-indigo-500', ring: 'ring-indigo-500' },
+          { name: 'gray', hex: '#8E8E93', bg: 'bg-gray-500', text: 'text-gray-500', light: 'bg-gray-500', ring: 'ring-gray-500' },
+        ];
+
+        const ICONS = [
+          { id: 'activity', Component: Activity, name: '运动/活跃' },
+          { id: 'book', Component: BookOpen, name: '阅读/学习' },
+          { id: 'zap', Component: Zap, name: '效率/工作' },
+          { id: 'award', Component: Award, name: '奖励/目标' },
+          { id: 'flame', Component: Flame, name: '能量/习惯' },
+          { id: 'calendar', Component: Calendar, name: '规划/日程' },
+          { id: 'check', Component: Check, name: '通用打勾' },
+        ];
+
+        const HABIT_TYPES = {
+          BINARY: { id: 'binary', name: '一次性打卡 (例如: 晨跑)' },
+          COUNT: { id: 'count', name: '多次打卡 (例如: 喝水杯数)' },
+        };
+
+
+        const getTodayString = () => new Date().toISOString().split('T')[0];
+        const formatDate = (date) => date.toISOString().split('T')[0];
+
+        const calculateStreak = (habit, logs) => {
+          let streak = 0;
+          const today = new Date();
+          for (let i = 0; i < 365; i++) {
+            const d = new Date(today);
+            d.setDate(d.getDate() - i);
+            const dateStr = formatDate(d);
+            
+            const todayCount = logs[habit.id]?.[getTodayString()]?.count || 0;
+            if (i === 0 && todayCount === 0) continue; 
+            
+            if ((logs[habit.id]?.[dateStr]?.count || 0) > 0) {
+              streak++;
+            } else {
+              break;
+            }
+          }
+          return streak;
+        };
+
+        const get7DayLog = (habitId, logs) => {
+          const data = [];
+          const today = new Date();
+          
+          for (let i = 6; i >= 0; i--) {
+            const d = new Date(today);
+            d.setDate(d.getDate() - i);
+            const dateStr = formatDate(d);
+            const dayOfWeek = d.getDay();
+
+            const count = logs[habitId]?.[dateStr]?.count || 0;
+
+            data.push({
+              dateStr,
+              dayOfWeek, 
+              count,
+            });
+          }
+          return data;
+        };
+
+        const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
+        const getFirstDayOfMonth = (year, month) => new Date(year, month, 1).getDay();
+
+        const MonthlyCalendarHeatmap = React.memo(({ year, month, habit, logs }) => {
+          const daysInMonth = getDaysInMonth(year, month);
+          const firstDay = getFirstDayOfMonth(year, month); 
+          
+          const daysArray = [];
+          for (let i = 0; i < firstDay; i++) daysArray.push(null); 
+          for (let i = 1; i <= daysInMonth; i++) daysArray.push(new Date(year, month, i));
+
+          const habitLogs = logs[habit.id] || {};
+          const habitColor = habit.color.bg;
+
+          return (
+            React.createElement("div", { className: `bg-white rounded-xl shadow-sm border border-gray-100 p-4` }, 
+              React.createElement("div", { className: "flex items-center gap-2 mb-3" }, 
+                React.createElement("div", { className: `w-3 h-3 rounded-full ${habit.color.bg}` }), 
+                React.createElement("h3", { className: "font-bold text-gray-800 text-sm" }, habit.name), 
+                React.createElement("span", { className: "text-xs text-gray-400 ml-auto" }, 
+                  habit.type === HABIT_TYPES.COUNT.id ? '多次' : '单次'
+                )
+              ), 
+              React.createElement("div", { className: `grid grid-cols-7 mb-2 text-center` }, 
+                ['日', '一', '二', '三', '四', '五', '六'].map(d => (
+                  React.createElement("div", { key: d, className: `text-gray-400 font-bold text-xs` }, d)
+                ))
+              ), 
+
+              React.createElement("div", { className: `grid grid-cols-7 gap-2` }, 
+                daysArray.map((date, idx) => {
+                  if (!date) return React.createElement("div", { key: idx, className: '' });
+                  
+                  const dateStr = formatDate(date);
+                  const count = habitLogs[dateStr]?.count || 0;
+                  const isDone = count > 0;
+
+                  return (
+                    React.createElement("div", { 
+                      key: idx, 
+                      className: `aspect-square rounded-[4px] flex items-center justify-center relative transition-colors duration-100`,
+                      style: {
+                        backgroundColor: isDone ? habit.color.hex : '#F3F4F6',
+                        opacity: habit.type === HABIT_TYPES.COUNT.id ? (0.3 + Math.min(count / 5, 1) * 0.7) : 1
+                      }
+                    }, 
+                      React.createElement("span", { className: `text-[10px] font-medium ${isDone ? 'text-white' : 'text-gray-600'}` }, 
+                        date.getDate()
+                      )
+                    )
+                  );
+                })
+              )
+            )
+          );
+        });
+
+        const AnnualCalendarHeatmapRow = React.memo(({ habit, logs, currentYear }) => {
+          const allYears = useMemo(() => {
+            const startYear = new Date(habit.id).getFullYear();
+            const endYear = new Date().getFullYear();
+            const years = [];
+            for (let y = endYear; y >= startYear; y--) {
+              years.push(y);
+            }
+            return years;
+          }, [habit.id]);
+
+          const [selectedYear, setSelectedYear] = useState(currentYear || allYears[0]);
+
+          const annualData = useMemo(() => {
+            const data = [];
+            const yearStart = new Date(selectedYear, 0, 1);
+            const yearEnd = new Date(selectedYear + 1, 0, 1);
+            
+            let currentDate = yearStart;
+            const todayStr = getTodayString();
+
+            while (currentDate < yearEnd) {
+              const dateStr = formatDate(currentDate);
+              
+              const count = logs[habit.id]?.[dateStr]?.count || 0;
+
+              data.push({
+                count,
+                dateStr,
+                isFuture: dateStr > todayStr
+              });
+
+              currentDate.setDate(currentDate.getDate() + 1);
+              if (data.length > 367) break;
+            }
+            return data;
+          }, [habit.id, selectedYear, logs]);
+
+          const habitHex = habit.color.hex;
+
+          return (
+            React.createElement("div", { className: "bg-white p-4 mb-6 rounded-2xl shadow-lg border border-gray-100 transition-all duration-300" }, 
+              React.createElement("div", { className: "flex justify-between items-center mb-4 border-b pb-3 border-gray-100" }, 
+                React.createElement("h3", { className: "text-xl font-semibold text-gray-900 flex items-center gap-2" }, 
+                  React.createElement("div", { className: `w-4 h-4 rounded-full ${habit.color.bg}` }), 
+                  habit.name
+                ), 
+
+                React.createElement("div", { className: "flex items-center space-x-2" }, 
+                  React.createElement("label", { htmlFor: `year-select-${habit.id}`, className: "text-sm font-medium text-gray-600" }, 
+                    "年份:"
+                  ), 
+                  React.createElement("select", {
+                    id: `year-select-${habit.id}`,
+                    value: selectedYear,
+                    onChange: (e) => setSelectedYear(parseInt(e.target.value)),
+                    className: "px-3 py-1 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg cursor-pointer transition-colors hover:bg-gray-100"
+                  }, 
+                    allYears.map((year) => (
+                      React.createElement("option", { key: year, value: year }, 
+                        year
+                      )
+                    ))
+                  )
+                )
+              ), 
+
+              React.createElement("div", { className: "overflow-x-auto overflow-y-hidden pt-2" }, 
+                React.createElement("div", { className: "flex flex-col space-y-1" }, 
+                  React.createElement("div", { className: "flex text-[8px] text-gray-400 font-medium" }, 
+                     React.createElement("div", { className: "w-[48px]" }, "一月"), 
+                     React.createElement("div", { className: "w-[48px] ml-[84px]" }, "三月"), 
+                     React.createElement("div", { className: "w-[48px] ml-[84px]" }, "五月"), 
+                     React.createElement("div", { className: "w-[48px] ml-[84px]" }, "七月"), 
+                     React.createElement("div", { className: "w-[48px] ml-[84px]" }, "九月"), 
+                     React.createElement("div", { className: "w-[48px] ml-[84px]" }, "十一月")
+                  ), 
+                  React.createElement("div", {
+                    className: "grid gap-0.5 min-w-full",
+                    style: {
+                      gridTemplateRows: 'repeat(7, 10px)',
+                      gridAutoFlow: 'column',
+                      width: `${(Math.ceil(annualData.length / 7) * 12)}px`,
+                    }
+                  }, 
+                    annualData.map((day, index) => {
+                      
+                      let backgroundColor = day.count > 0 ? habitHex : '#E5E7EB'; 
+                      let opacity = 1;
+
+                      if (day.isFuture) {
+                        backgroundColor = '#F3F4F6';
+                      } else if (day.count > 0) {
+                         opacity = habit.type === HABIT_TYPES.COUNT.id ? (0.3 + Math.min(day.count / 5, 1) * 0.7) : 1;
+                      }
+
+                      return (
+                        React.createElement("div", {
+                          key: index,
+                          className: `w-[10px] h-[10px] rounded-[2px] cursor-pointer transition-transform duration-100`,
+                          style: { backgroundColor: backgroundColor, opacity: opacity },
+                          title: `${day.dateStr}：${day.count > 0 ? `完成 ${day.count} 次` : '未完成'}`
+                        })
+                      );
+                    })
+                  )
+                )
+              )
+            )
+          );
+        });
+
+
+        function App() {
+          const [activeTab, setActiveTab] = useState('habits');
+          const [habits, setHabits] = useState([]);
+          const [logs, setLogs] = useState({}); 
+          const [showAddModal, setShowAddModal] = useState(false);
+          const [selectedHabitForNote, setSelectedHabitForNote] = useState(null);
+          const [noteText, setNoteText] = useState('');
+
+          const [statsView, setStatsView] = useState('monthly');
+          const [currentDateView, setCurrentDateView] = useState(new Date());
+          const currentYear = new Date().getFullYear();
+
+          useEffect(() => {
+            const savedHabits = localStorage.getItem('ios_habits');
+            const savedLogs = localStorage.getItem('ios_logs');
+            
+            if (savedHabits) {
+               setHabits(JSON.parse(savedHabits));
+            } else {
+              setHabits([
+                { id: 1672531200000, name: '晨跑', color: COLORS[1], icon: 'activity', type: HABIT_TYPES.BINARY.id },
+                { id: 1672531200001, name: '阅读 30 分钟', color: COLORS[0], icon: 'book', type: HABIT_TYPES.BINARY.id },
+                { id: 1672531200002, name: '喝水 8 杯', color: COLORS[5], icon: 'zap', type: HABIT_TYPES.COUNT.id },
+              ]);
+            }
+
+            if (savedLogs) {
+              setLogs(JSON.parse(savedLogs));
+            } else if (!savedHabits) {
+               const initialHabits = [
+                { id: 1672531200000, type: HABIT_TYPES.BINARY.id },
+                { id: 1672531200001, type: HABIT_TYPES.BINARY.id },
+                { id: 1672531200002, type: HABIT_TYPES.COUNT.id }
+               ];
+               const initialLogs = {};
+               const today = new Date();
+               for (let h of initialHabits) {
+                  initialLogs[h.id] = {};
+                  for (let i = 0; i < 90; i++) {
+                     const d = new Date(today);
+                     d.setDate(d.getDate() - i);
+                     const dateStr = formatDate(d);
+                     if (Math.random() > 0.3) {
+                        const count = h.type === HABIT_TYPES.COUNT.id ? Math.floor(Math.random() * 4) + 1 : 1;
+                        initialLogs[h.id][dateStr] = { count: count, note: '' };
+                     }
+                  }
+               }
+               setLogs(initialLogs);
+            }
+          }, []);
+
+          useEffect(() => {
+            localStorage.setItem('ios_habits', JSON.stringify(habits));
+            localStorage.setItem('ios_logs', JSON.stringify(logs));
+          }, [habits, logs]);
+          
+          const updateHabitCount = useCallback((habitId, change) => {
+            const dateStr = getTodayString();
+            setLogs(prev => {
+              const habitLogs = prev[habitId] || {};
+              const currentCount = habitLogs[dateStr]?.count || 0;
+              
+              let newCount = currentCount + change;
+              newCount = Math.max(0, newCount);
+
+              if (newCount === 0) {
+                  const newHabitLogs = { ...habitLogs };
+                  delete newHabitLogs[dateStr];
+                  return { ...prev, [habitId]: newHabitLogs };
+              }
+              
+              return {
+                ...prev,
+                [habitId]: {
+                  ...habitLogs,
+                  [dateStr]: { ...habitLogs[dateStr], count: newCount }
+                }
+              };
+            });
+          }, []);
+
+          const toggleBinaryHabit = useCallback((habitId) => {
+              updateHabitCount(habitId, (logs[habitId]?.[getTodayString()]?.count || 0) === 0 ? 1 : -1);
+          }, [logs, updateHabitCount]);
+
+          const incrementCountHabit = useCallback((habitId) => {
+              updateHabitCount(habitId, 1);
+          }, [updateHabitCount]);
+
+          const decrementCountHabit = useCallback((habitId) => {
+              updateHabitCount(habitId, -1);
+          }, [updateHabitCount]);
+
+
+          const addHabit = (newHabit) => {
+            setHabits([...habits, { ...newHabit, id: Date.now() }]);
+            setShowAddModal(false);
+          };
+
+          const deleteHabit = (id) => {
+            setHabits(habits.filter(h => h.id !== id));
+            setLogs(prev => {
+                const newLogs = { ...prev };
+                delete newLogs[id];
+                return newLogs;
+            });
+          };
+
+          const saveNote = () => {
+            if (!selectedHabitForNote) return;
+            const dateStr = getTodayString();
+            const currentCount = logs[selectedHabitForNote.id]?.[dateStr]?.count || 0;
+
+            setLogs(prev => ({
+              ...prev,
+              [selectedHabitForNote.id]: {
+                ...(prev[selectedHabitForNote.id] || {}),
+                [dateStr]: { 
+                  count: currentCount > 0 ? currentCount : 1, 
+                  note: noteText 
+                }
+              }
+            }));
+            setSelectedHabitForNote(null);
+            setNoteText('');
+          };
+
+          const exportData = (format) => {
+             const data = { habits, logs };
+             let content;
+             let filename;
+
+             if (format === 'json') {
+                 content = JSON.stringify(data, null, 2);
+                 filename = `habit_tracker_data_${getTodayString()}.json`;
+             } else if (format === 'csv') {
+                 let csvContent = "data:text/csv;charset=utf-8,HabitID,HabitName,Date,Count,Note\n";
+                 
+                 habits.forEach(habit => {
+                     const habitLogs = logs[habit.id] || {};
+                     Object.keys(habitLogs).forEach(date => {
+                         const logEntry = habitLogs[date];
+                         const line = [
+                             habit.id,
+                             `"${habit.name.replace(/"/g, '""')}"`,
+                             date,
+                             logEntry.count,
+                             `"${(logEntry.note || '').replace(/"/g, '""')}"`
+                         ].join(',');
+                         csvContent += line + "\n";
+                     });
+                 });
+                 
+                 content = csvContent;
+                 filename = `habit_tracker_logs_${getTodayString()}.csv`;
+             } else {
+                 return;
+             }
+
+             const blob = new Blob([content], { type: format === 'json' ? 'application/json' : 'text/csv' });
+             const url = URL.createObjectURL(blob);
+             const a = document.createElement('a');
+             a.href = url;
+             a.download = filename;
+             document.body.appendChild(a);
+             a.click();
+             document.body.removeChild(a);
+             URL.revokeObjectURL(url);
+          };
+
+          const renderStatsHeader = () => (
+            React.createElement("div", { className: "space-y-4 mb-6" }, 
+              React.createElement("div", null, 
+                React.createElement("h2", { className: "text-gray-500 text-xs font-bold uppercase tracking-wider mb-1" }, "数据中心"), 
+                React.createElement("h1", { className: "text-3xl font-bold text-gray-900" }, "统计概览")
+              ), 
+
+              React.createElement("div", { className: "bg-gray-200 p-1 rounded-lg flex text-sm font-medium shadow-inner" }, 
+                React.createElement("button", { 
+                  onClick: () => setStatsView('monthly'),
+                  className: `flex-1 py-1.5 rounded-md transition-all duration-200 ${statsView === 'monthly' ? 'bg-white text-gray-900 shadow-sm font-semibold' : 'text-gray-500 hover:text-gray-700'}`
+                }, 
+                  "月度热力图"
+                ), 
+                React.createElement("button", { 
+                  onClick: () => setStatsView('annual_heatmap'),
+                  className: `flex-1 py-1.5 rounded-md transition-all duration-200 ${statsView === 'annual_heatmap' ? 'bg-white text-gray-900 shadow-sm font-semibold' : 'text-gray-500 hover:text-gray-700'}`
+                }, 
+                  "年度热力图"
+                )
+              )
+            )
+          );
+
+          const renderMonthlyView = () => {
+            const year = currentDateView.getFullYear();
+            const month = currentDateView.getMonth(); 
+            
+            const changeMonth = (delta) => {
+              const newDate = new Date(currentDateView);
+              newDate.setMonth(newDate.getMonth() + delta);
+              setCurrentDateView(newDate);
+            };
+            
+            const currentMonthStr = `${year}年 ${month + 1}月`;
+            const totalHabits = habits.length;
+
+            return (
+              React.createElement("div", { className: "space-y-4 animate-in fade-in duration-300" }, 
+                 React.createElement("div", { className: "flex justify-between items-center mb-6 bg-white p-2 rounded-xl shadow-sm border border-gray-100" }, 
+                    React.createElement("button", { onClick: () => changeMonth(-1), className: "p-1 hover:bg-gray-100 rounded-lg" }, React.createElement(ChevronLeft, { size: 18 })), 
+                    React.createElement("div", { className: "text-center px-4" }, 
+                      React.createElement("div", { className: "font-bold text-gray-800 text-sm" }, 
+                        currentMonthStr
+                      )
+                    ), 
+                    React.createElement("button", { onClick: () => changeMonth(1), className: "p-1 hover:bg-gray-100 rounded-lg" }, React.createElement(ChevronRight, { size: 18 }))
+                  ), 
+
+                totalHabits === 0 ? (
+                   React.createElement("div", { className: "text-center py-10 text-gray-400 bg-white rounded-xl shadow-sm border border-gray-100" }, 
+                      React.createElement("p", null, "请先添加习惯，以便查看月度追踪数据。")
+                   )
+                ) : (
+                  React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" }, 
+                    habits.map(h => (
+                      React.createElement(MonthlyCalendarHeatmap, { 
+                        key: h.id,
+                        year: year,
+                        month: month,
+                        habit: h,
+                        logs: logs
+                      })
+                    ))
+                  )
+                )
+              )
+            );
+          };
+          
+          const renderAnnualHeatmapView = () => {
+            const totalHabits = habits.length;
+
+            return (
+              React.createElement("div", { className: "space-y-4 animate-in fade-in duration-300" }, 
+                React.createElement("div", { className: "bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-4" }, 
+                  React.createElement("div", { className: "flex items-start gap-3" }, 
+                     React.createElement(Activity, { className: "text-indigo-500 shrink-0", size: 20 }), 
+                     React.createElement("div", null, 
+                       React.createElement("h3", { className: "font-bold text-indigo-800 text-sm" }, "年度热力图"), 
+                       React.createElement("p", { className: "text-xs text-indigo-600 mt-1" }, 
+                         "每行展示一个习惯全年的完成情况，颜色深度代表完成次数。"
+                       )
+                     )
+                  )
+                ), 
+
+                totalHabits === 0 ? (
+                   React.createElement("div", { className: "text-center py-10 text-gray-400 bg-white rounded-xl shadow-sm border border-gray-100" }, 
+                      React.createElement("p", null, "请先添加习惯，以便查看年度追踪数据。")
+                   )
+                ) : (
+                  habits.map(h => (
+                    React.createElement(AnnualCalendarHeatmapRow, { 
+                      key: h.id,
+                      habit: h,
+                      logs: logs,
+                      currentYear: currentYear
+                    })
+                  ))
+                )
+              )
+            );
+          };
+
+
+          const renderHabitList = () => (
+            React.createElement("div", { className: "pb-24 pt-14 px-4 space-y-4 animate-in fade-in duration-300" }, 
+              React.createElement("div", { className: "flex justify-between items-end mb-6" }, 
+                React.createElement("div", null, 
+                  React.createElement("h2", { className: "text-gray-500 text-sm font-semibold uppercase tracking-wider" }, "今天"), 
+                  React.createElement("h1", { className: "text-3xl font-bold text-gray-900" }, "我的习惯")
+                ), 
+                React.createElement("div", { className: "text-right" }, 
+                   React.createElement("span", { className: "text-sm text-gray-400" }, new Date().toLocaleDateString('zh-CN', { weekday: 'long', month: 'short', day: 'numeric' }))
+                )
+              ), 
+
+              habits.length === 0 ? (
+                React.createElement("div", { className: "text-center py-20 text-gray-400" }, 
+                  React.createElement("p", null, "还没有习惯，点击右上角添加！")
+                )
+              ) : (
+                habits.map(habit => {
+                  const count = logs[habit.id]?.[getTodayString()]?.count || 0;
+                  const isCompleted = count > 0;
+                  const currentNote = logs[habit.id]?.[getTodayString()]?.note;
+                  const streak = calculateStreak(habit, logs);
+                  const IconComp = ICONS.find(i => i.id === habit.icon)?.Component || Activity;
+
+                  const sevenDayData = get7DayLog(habit.id, logs);
+                  const dayLabels = ['日', '一', '二', '三', '四', '五', '六'];
+
+
+                  return (
+                    React.createElement("div", { key: habit.id, className: "bg-white rounded-2xl p-4 shadow-sm border border-gray-100 transition-all active:scale-[0.99] group" }, 
+                      React.createElement("div", { className: "flex items-center justify-between mb-4" }, 
+                        React.createElement("div", { className: "flex items-center gap-4" }, 
+                          React.createElement("div", { className: `w-12 h-12 rounded-full flex items-center justify-center ${habit.color.light} ${habit.color.text}` }, 
+                            React.createElement(IconComp, { size: 24 })
+                          ), 
+                          React.createElement("div", null, 
+                            React.createElement("h3", { className: "font-bold text-gray-800 text-lg" }, habit.name), 
+                            React.createElement("div", { className: "flex items-center gap-2 text-xs text-gray-500 font-medium" }, 
+                              React.createElement("span", { className: "flex items-center gap-1" }, 
+                                React.createElement(Zap, { size: 12, className: streak > 0 ? 'text-orange-500' : 'text-gray-300' }), 
+                                streak, " 天连续"
+                              ), 
+                              currentNote && (
+                                React.createElement("span", { className: "flex items-center gap-1 text-blue-500" }, 
+                                  React.createElement(Edit3, { size: 12 }), 
+                                  "已备注"
+                                )
+                              )
+                            )
+                          )
+                        ), 
+                        
+                        React.createElement("div", { className: "flex items-center gap-2" }, 
+                          React.createElement("button", { 
+                            onClick: () => {
+                              setSelectedHabitForNote(habit);
+                              setNoteText(logs[habit.id]?.[getTodayString()]?.note || '');
+                            },
+                            className: "p-2 text-gray-300 hover:text-gray-500 transition-colors",
+                            title: "添加备注"
+                          }, 
+                            React.createElement(Edit3, { size: 20 })
+                          ), 
+                          
+                          habit.type === HABIT_TYPES.COUNT.id && (
+                            React.createElement("button", {
+                                onClick: () => decrementCountHabit(habit.id),
+                                disabled: count === 0,
+                                className: `w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${count > 0 ? 'bg-gray-200 text-gray-700' : 'bg-gray-100 text-gray-300 cursor-not-allowed'}`,
+                                title: "减少次数"
+                            }, 
+                                React.createElement(Minus, { size: 16, strokeWidth: 3 })
+                            )
+                          ), 
+
+                          React.createElement("button", {
+                            onClick: () => habit.type === HABIT_TYPES.BINARY.id ? toggleBinaryHabit(habit.id) : incrementCountHabit(habit.id),
+                            className: `w-12 h-12 rounded-full flex flex-col items-center justify-center transition-all duration-300 shadow-md ${isCompleted ? habit.color.bg : 'bg-gray-100 text-gray-300'}`,
+                            title: habit.type === HABIT_TYPES.BINARY.id ? '打卡/取消' : '增加一次'
+                          }, 
+                            habit.type === HABIT_TYPES.COUNT.id ? (
+                                React.createElement(React.Fragment, null, 
+                                    React.createElement("span", { className: `text-xl font-bold ${isCompleted ? 'text-white' : 'text-gray-500'}` }, count), 
+                                    React.createElement("span", { className: `text-[10px] font-medium ${isCompleted ? 'text-white/80' : 'text-gray-400'}` }, "+1")
+                                )
+                            ) : (
+                                React.createElement(Check, { size: 24, className: isCompleted ? 'text-white' : '', strokeWidth: 3 })
+                            )
+                          )
+                        )
+                      ), 
+
+                      React.createElement("div", { className: "mt-3 pt-3 border-t border-gray-100" }, 
+                          React.createElement("div", { className: "grid grid-cols-7 gap-1.5 text-center" }, 
+                              sevenDayData.map((day, index) => {
+                                  const isToday = index === 6;
+                                  const isDone = day.count > 0;
+                                  
+                                  let opacity = 1;
+                                  if (habit.type === HABIT_TYPES.COUNT.id && isDone) {
+                                     opacity = 0.3 + Math.min(day.count / 5, 1) * 0.7;
+                                  }
+
+                                  return (
+                                      React.createElement("div", { key: day.dateStr, className: "flex flex-col items-center" }, 
+                                          React.createElement("span", { className: `text-[10px] font-medium mb-1 ${isToday ? 'text-blue-500 font-bold' : 'text-gray-400'}` }, 
+                                              dayLabels[day.dayOfWeek]
+                                          ), 
+                                          
+                                          React.createElement("div", { 
+                                              className: `w-6 h-6 rounded-lg flex items-center justify-center transition-all duration-200`,
+                                              style: {
+                                                  backgroundColor: isDone ? habit.color.hex : '#E5E7EB',
+                                                  opacity: opacity
+                                              },
+                                              title: `${day.dateStr} - ${day.count} 次`
+                                          }, 
+                                              isDone && habit.type === HABIT_TYPES.BINARY.id && (
+                                                  React.createElement(Check, { size: 12, className: "text-white", strokeWidth: 3 })
+                                              ), 
+                                              isDone && habit.type === HABIT_TYPES.COUNT.id && (
+                                                    React.createElement("span", { className: "text-[10px] text-white font-bold" }, day.count)
+                                              )
+                                          )
+                                      )
+                                  );
+                              })
+                          )
+                      )
+                    )
+                  );
+                })
+              )
+            )
+          );
+
+          const renderStats = () => (
+            React.createElement("div", { className: "pb-24 pt-14 px-4" }, 
+              renderStatsHeader(),
+              statsView === 'monthly' && renderMonthlyView(),
+              statsView === 'annual_heatmap' && renderAnnualHeatmapView()
+            )
+          );
+
+          const renderSettings = () => (
+            React.createElement("div", { className: "pb-24 pt-14 px-4 space-y-6 animate-in fade-in duration-300" }, 
+              React.createElement("div", null, 
+                React.createElement("h2", { className: "text-gray-500 text-sm font-semibold uppercase tracking-wider" }, "设置"), 
+                React.createElement("h1", { className: "text-3xl font-bold text-gray-900" }, "偏好与小组件")
+              ), 
+
+              React.createElement("div", { className: "bg-gray-50 rounded-2xl p-6 border border-gray-200" }, 
+                React.createElement("h3", { className: "font-bold text-gray-800 mb-4 flex items-center gap-2" }, 
+                  React.createElement(Smartphone, { size: 20, className: "text-blue-500" }), " iOS 小组件预览"
+                ), 
+                React.createElement("p", { className: "text-sm text-gray-500 mb-4" }, 
+                  "在 iOS 主屏幕上添加小组件，无需打开 App 即可打卡。（Web 模拟效果）"
+                ), 
+                
+                React.createElement("div", { className: "flex justify-center" }, 
+                  React.createElement("div", { className: "w-36 h-36 bg-white rounded-[22px] shadow-lg p-4 flex flex-col justify-between relative overflow-hidden" }, 
+                     React.createElement("div", { className: "absolute top-0 left-0 w-full h-1 bg-blue-500" }), 
+                     React.createElement("div", { className: "flex justify-between items-start" }, 
+                       React.createElement("div", { className: "w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-500" }, 
+                         React.createElement(Activity, { size: 16 })
+                       ), 
+                       React.createElement("span", { className: "text-xs font-bold text-gray-400" }, "TODAY")
+                     ), 
+                     React.createElement("div", null, 
+                       React.createElement("div", { className: "font-bold text-gray-900 leading-tight" }, "晨跑"), 
+                       React.createElement("div", { className: "text-xs text-gray-500" }, "连续 5 天")
+                     ), 
+                     React.createElement("button", { className: "w-full py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold rounded-lg transition-colors" }, 
+                       "完成"
+                     )
+                  )
+                )
+              ), 
+
+              React.createElement("div", { className: "bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden" }, 
+                React.createElement("div", { className: "p-4 border-b border-gray-100" }, 
+                  React.createElement("h3", { className: "font-bold text-gray-800" }, "数据管理")
+                ), 
+                React.createElement("div", { className: "divide-y divide-gray-100" }, 
+                  React.createElement("button", { onClick: () => exportData('csv'), className: "w-full p-4 flex items-center justify-between hover:bg-gray-50 text-left" }, 
+                    React.createElement("span", { className: "text-gray-700" }, "导出为 CSV"), 
+                    React.createElement(Download, { size: 18, className: "text-gray-400" })
+                  ), 
+                  React.createElement("button", { onClick: () => exportData('json'), className: "w-full p-4 flex items-center justify-between hover:bg-gray-50 text-left" }, 
+                    React.createElement("span", { className: "text-gray-700" }, "导出为 JSON (备份)"), 
+                    React.createElement(Download, { size: 18, className: "text-gray-400" })
+                  ), 
+                  React.createElement("button", { 
+                    onClick: () => {
+                      if(window.confirm('确定清除所有数据？此操作不可逆。')) {
+                        localStorage.clear();
+                        window.location.reload();
+                      }
+                    },
+                    className: "w-full p-4 flex items-center justify-between hover:bg-red-50 text-left"
+                  }, 
+                    React.createElement("span", { className: "text-red-500" }, "清除所有数据"), 
+                    React.createElement(Trash2, { size: 18, className: "text-red-400" })
+                  )
+                )
+              ), 
+              
+              React.createElement("div", { className: "text-center text-xs text-gray-400 mt-8" }, 
+                React.createElement("p", null, "隐私承诺：所有数据仅存储在您的设备上 (LocalStorage)。"), 
+                React.createElement("p", null, "无广告 · 无追踪 · 纯净体验")
+              )
+            )
+          );
+
+
+          return (
+            React.createElement("div", { className: "bg-[#F2F2F7] min-h-screen font-sans selection:bg-blue-200" }, 
+              React.createElement("div", { className: "fixed top-0 left-0 w-full h-6 bg-[#F2F2F7]/80 backdrop-blur-md z-50" }), 
+
+              activeTab === 'habits' && (
+                React.createElement("button", { 
+                  onClick: () => setShowAddModal(true),
+                  className: "fixed top-6 right-4 z-40 p-2 text-blue-500 active:opacity-50"
+                }, 
+                  React.createElement(Plus, { size: 28 })
+                )
+              ), 
+
+              React.createElement("div", { className: "max-w-md mx-auto min-h-screen bg-[#F2F2F7] relative shadow-2xl" }, 
+                
+                activeTab === 'habits' && renderHabitList(),
+                activeTab === 'stats' && renderStats(),
+                activeTab === 'settings' && renderSettings(),
+
+                React.createElement("div", { className: "fixed bottom-0 left-0 w-full bg-white/80 backdrop-blur-lg border-t border-gray-200 z-50 pb-safe" }, 
+                  React.createElement("div", { className: "max-w-md mx-auto flex justify-around items-center h-16 pb-2" }, 
+                    React.createElement("button", { 
+                      onClick: () => setActiveTab('habits'),
+                      className: `flex flex-col items-center justify-center w-full space-y-1 ${activeTab === 'habits' ? 'text-blue-500' : 'text-gray-400'}`
+                    }, 
+                      React.createElement(Check, { size: 24, strokeWidth: activeTab === 'habits' ? 2.5 : 2 }), 
+                      React.createElement("span", { className: "text-[10px] font-medium" }, "打卡")
+                    ), 
+                    React.createElement("button", { 
+                      onClick: () => setActiveTab('stats'),
+                      className: `flex flex-col items-center justify-center w-full space-y-1 ${activeTab === 'stats' ? 'text-blue-500' : 'text-gray-400'}`
+                    }, 
+                      React.createElement(BarChart2, { size: 24, strokeWidth: activeTab === 'stats' ? 2.5 : 2 }), 
+                      React.createElement("span", { className: "text-[10px] font-medium" }, "统计")
+                    ), 
+                    React.createElement("button", { 
+                      onClick: () => setActiveTab('settings'),
+                      className: `flex flex-col items-center justify-center w-full space-y-1 ${activeTab === 'settings' ? 'text-blue-500' : 'text-gray-400'}`
+                    }, 
+                      React.createElement(Settings, { size: 24, strokeWidth: activeTab === 'settings' ? 2.5 : 2 }), 
+                      React.createElement("span", { className: "text-[10px] font-medium" }, "设置")
+                    )
+                  )
+                )
+              ), 
+
+              showAddModal && (
+                React.createElement(AddHabitModal, { 
+                  onClose: () => setShowAddModal(false), 
+                  onSave: addHabit
+                })
+              ), 
+
+              selectedHabitForNote && (
+                React.createElement("div", { className: "fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/30 backdrop-blur-sm p-4" }, 
+                  React.createElement("div", { className: "bg-white w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom-10 fade-in duration-200" }, 
+                    React.createElement("div", { className: "p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50" }, 
+                      React.createElement("span", { className: "font-semibold text-gray-700" }, "添加备注"), 
+                      React.createElement("button", { onClick: () => setSelectedHabitForNote(null), className: "text-gray-400 hover:text-gray-600" }, 
+                        React.createElement(X, { size: 20 })
+                      )
+                    ), 
+                    React.createElement("div", { className: "p-4" }, 
+                      React.createElement("div", { className: "flex items-center gap-2 mb-3 text-sm text-gray-500" }, 
+                        React.createElement("span", { className: `w-2 h-2 rounded-full ${selectedHabitForNote.color.bg}` }), 
+                        selectedHabitForNote.name, " - ", getTodayString()
+                      ), 
+                      React.createElement("textarea", { 
+                        className: "w-full h-32 p-3 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-blue-500 resize-none text-gray-700",
+                        placeholder: "今天感觉如何？写点什么吧...",
+                        value: noteText,
+                        onChange: (e) => setNoteText(e.target.value),
+                        autoFocus: true
+                      }), 
+                      React.createElement("button", { 
+                        onClick: saveNote,
+                        className: "w-full mt-4 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-xl transition-colors"
+                      }, 
+                        "保存并打卡"
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          );
+        }
+
+        function AddHabitModal({ onClose, onSave }) {
+          const [name, setName] = useState('');
+          const [selectedColor, setSelectedColor] = useState(COLORS[0]);
+          const [selectedIcon, setSelectedIcon] = useState(ICONS[0].id);
+          const [selectedType, setSelectedType] = useState(HABIT_TYPES.BINARY.id);
+          
+          const handleSubmit = (e) => {
+            e.preventDefault();
+            if (!name.trim()) return;
+            onSave({
+              name,
+              color: selectedColor,
+              icon: selectedIcon,
+              type: selectedType,
+            });
+          };
+          
+          const CurrentIcon = ICONS.find(i => i.id === selectedIcon)?.Component || Activity;
+
+          return (
+            React.createElement("div", { className: "fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" }, 
+              React.createElement("div", { className: "bg-[#F2F2F7] w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl max-h-[90vh] overflow-y-auto" }, 
+                React.createElement("div", { className: "bg-white px-4 py-3 flex justify-between items-center sticky top-0 z-10 border-b border-gray-200" }, 
+                  React.createElement("button", { onClick: onClose, className: "text-blue-500 text-sm font-medium" }, "取消"), 
+                  React.createElement("span", { className: "font-semibold text-gray-900" }, "新习惯"), 
+                  React.createElement("button", { 
+                    onClick: handleSubmit, 
+                    disabled: !name.trim(),
+                    className: `text-sm font-bold ${!name.trim() ? 'text-gray-300' : 'text-blue-500'}`
+                  }, 
+                    "保存"
+                  )
+                ), 
+
+                React.createElement("div", { className: "p-6 space-y-6" }, 
+                  React.createElement("div", { className: "flex justify-center mb-6 relative" }, 
+                    React.createElement("div", { className: `w-20 h-20 rounded-full flex items-center justify-center shadow-lg transition-colors duration-300 ${selectedColor.bg}` }, 
+                       React.createElement(CurrentIcon, { size: 40, className: "text-white" })
+                    )
+                  ), 
+                  React.createElement("div", { className: "bg-white rounded-xl px-4 py-2 shadow-sm" }, 
+                    React.createElement("input", { 
+                      type: "text", 
+                      placeholder: "习惯名称 (例如: 晨跑, 喝水 8 杯)", 
+                      className: "w-full py-2 bg-transparent outline-none text-gray-900 placeholder-gray-400",
+                      value: name,
+                      onChange: (e) => setName(e.target.value),
+                      autoFocus: true
+                    })
+                  ), 
+                  
+                  React.createElement("div", null, 
+                    React.createElement("label", { className: "text-xs font-semibold text-gray-400 uppercase ml-2 mb-2 block" }, "打卡频率类型"), 
+                    React.createElement("div", { className: "bg-white rounded-xl overflow-hidden shadow-sm divide-y divide-gray-100" }, 
+                       React.createElement("div", { className: "p-3 flex justify-between items-center cursor-pointer", onClick: () => setSelectedType(HABIT_TYPES.BINARY.id) }, 
+                          React.createElement("span", { className: "text-gray-900" }, HABIT_TYPES.BINARY.name), 
+                          selectedType === HABIT_TYPES.BINARY.id && React.createElement(Check, { size: 18, className: "text-blue-500" })
+                       ), 
+                       React.createElement("div", { className: "p-3 flex justify-between items-center cursor-pointer", onClick: () => setSelectedType(HABIT_TYPES.COUNT.id) }, 
+                          React.createElement("span", { className: "text-gray-900" }, HABIT_TYPES.COUNT.name), 
+                          selectedType === HABIT_TYPES.COUNT.id && React.createElement(Check, { size: 18, className: "text-blue-500" })
+                       )
+                    )
+                  ), 
+
+
+                  React.createElement("div", null, 
+                    React.createElement("label", { className: "text-xs font-semibold text-gray-400 uppercase ml-2 mb-2 block" }, "颜色 (当前: ", selectedColor.name, ")"), 
+                    React.createElement("div", { className: "bg-white rounded-xl p-4 shadow-sm grid grid-cols-4 gap-4" }, 
+                      COLORS.map(c => (
+                        React.createElement("button", { 
+                          key: c.name,
+                          onClick: () => setSelectedColor(c),
+                          className: `w-full aspect-square rounded-full flex items-center justify-center ${c.bg} ${selectedColor.name === c.name ? 'ring-4 ring-offset-2 ring-gray-200' : ''}`
+                        }, 
+                          selectedColor.name === c.name && React.createElement(Check, { size: 16, className: "text-white" })
+                        )
+                      ))
+                    )
+                  ), 
+                  React.createElement("div", null, 
+                    React.createElement("label", { className: "text-xs font-semibold text-gray-400 uppercase ml-2 mb-2 block" }, "图标 (当前: ", ICONS.find(i => i.id === selectedIcon)?.name, ")"), 
+                    React.createElement("div", { className: "bg-white rounded-xl p-4 shadow-sm grid grid-cols-5 gap-2" }, 
+                      ICONS.map(i => (
+                        React.createElement("button", { 
+                          key: i.id,
+                          onClick: () => setSelectedIcon(i.id),
+                          className: `w-full aspect-square rounded-lg flex items-center justify-center text-gray-500 hover:bg-gray-50 ${selectedIcon === i.id ? 'bg-gray-100 text-blue-500' : ''}`
+                        }, 
+                          React.createElement(i.Component, { size: 24 })
+                        )
+                      ))
+                    )
+                  )
+                )
+              )
+            )
+          );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(React.createElement(App, null));
+    </script>
+
+    <!-- Service Worker Script (for production, this would be a separate file at the root) -->
+    <script>
+        // In a real PWA setup, this content would be in public/service-worker.js
+        // and registered from your main JS bundle.
+        // For this single-file demo, it's embedded and dynamically registered.
+        // This worker needs to be at the root of your deployment to control the whole scope.
+        // Ensure you have /icons/icon-192x192.png etc. relative to your deployed root.
+
+        // Create a Blob URL for the Service Worker for this single-file demo.
+        // In production, `service-worker.js` would be a static file.
+        const serviceWorkerContent = `
+            const CACHE_NAME = 'habit-tracker-cache-v1';
+            const urlsToCache = [
+              '/',
+              '/index.html',
+              // Add other static assets here relative to the root of your deployment
+              // For this single-file demo, we mostly cache the index.html and icons
+              '/icons/icon-192x192.png',
+              '/icons/icon-512x512.png',
+              // If you had separate CSS/JS files, you'd list them like:
+              // '/static/css/main.css',
+              // '/static/js/main.js',
+            ];
+
+            self.addEventListener('install', (event) => {
+              console.log('Service Worker: Installing');
+              event.waitUntil(
+                caches.open(CACHE_NAME)
+                  .then((cache) => {
+                    console.log('Service Worker: Opened cache');
+                    return cache.addAll(urlsToCache);
+                  })
+                  .then(() => self.skipWaiting()) // Activates the new service worker immediately
+              );
+            });
+
+            self.addEventListener('activate', (event) => {
+              console.log('Service Worker: Activating');
+              const cacheWhitelist = [CACHE_NAME];
+              event.waitUntil(
+                caches.keys().then((cacheNames) => {
+                  return Promise.all(
+                    cacheNames.map((cacheName) => {
+                      if (cacheWhitelist.indexOf(cacheName) === -1) {
+                        console.log('Service Worker: Deleting old cache', cacheName);
+                        return caches.delete(cacheName);
+                      }
+                    })
+                  );
+                }).then(() => self.clients.claim()) // Takes control of current clients
+              );
+            });
+
+            self.addEventListener('fetch', (event) => {
+              event.respondWith(
+                caches.match(event.request)
+                  .then((response) => {
+                    if (response) {
+                      return response;
+                    }
+                    return fetch(event.request).catch(() => {
+                        // Optional: Return a fallback page for offline if needed
+                        // if (event.request.mode === 'navigate') {
+                        //     return caches.match('/offline.html');
+                        // }
+                        throw new Error('Network request failed and no cache match.');
+                    });
+                  })
+              );
+            });
+        `;
+        const serviceWorkerBlob = new Blob([serviceWorkerContent], { type: 'application/javascript' });
+        const serviceWorkerUrl = URL.createObjectURL(serviceWorkerBlob);
+
+        // Register the Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                // We're dynamically registering a Blob URL. In a real app, you'd register a static file path.
+                // The scope is determined by the service worker's actual URL, so for a root-level worker, it would control everything.
+                // For a Blob URL, the scope might be more restrictive or might inherit the page's scope.
+                navigator.serviceWorker.register(serviceWorkerUrl, { scope: '/' }) // Ensure scope is '/' to cover the whole app
+                    .then(registration => {
+                        console.log('Inline Service Worker registered with scope:', registration.scope);
+                    })
+                    .catch(error => {
+                        console.error('Inline Service Worker registration failed:', error);
+                    });
+            });
+        }
+    </script>
+</body>
+</html>
