@@ -44,36 +44,6 @@
     <div id="root"></div>
 
     <!-- PWA Manifest JSON (for convenience, normally a separate file) -->
-    <script id="manifest-data" type="application/json">
-        {
-            "short_name": "习惯追踪",
-            "name": "我的习惯追踪器",
-            "icons": [
-                {
-                    "src": "/icons/icon-192x192.png",
-                    "type": "image/png",
-                    "sizes": "192x192"
-                },
-                {
-                    "src": "/icons/icon-512x512.png",
-                    "type": "image/png",
-                    "sizes": "512x512"
-                }
-            ],
-            "start_url": ".",
-            "display": "standalone",
-            "theme_color": "#007AFF",
-            "background_color": "#F2F2F7"
-        }
-    </script>
-    <script>
-        // Dynamically create manifest.json for testing purposes
-        // In a real build, this would be a static file.
-        const manifestData = JSON.parse(document.getElementById('manifest-data').textContent);
-        const manifestBlob = new Blob([JSON.stringify(manifestData)], {type : 'application/json'});
-        const manifestUrl = URL.createObjectURL(manifestBlob);
-        document.querySelector('link[rel="manifest"]').setAttribute('href', manifestUrl);
-    </script>
 
     <script type="module">
         import React, { useState, useEffect, useMemo, useCallback } from 'https://esm.sh/react@18.2.0';
@@ -1044,69 +1014,7 @@
 
         // Create a Blob URL for the Service Worker for this single-file demo.
         // In production, `service-worker.js` would be a static file.
-        const serviceWorkerContent = `
-            const CACHE_NAME = 'habit-tracker-cache-v1';
-            const urlsToCache = [
-              '/',
-              '/index.html',
-              // Add other static assets here relative to the root of your deployment
-              // For this single-file demo, we mostly cache the index.html and icons
-              '/icons/icon-192x192.png',
-              '/icons/icon-512x512.png',
-              // If you had separate CSS/JS files, you'd list them like:
-              // '/static/css/main.css',
-              // '/static/js/main.js',
-            ];
-
-            self.addEventListener('install', (event) => {
-              console.log('Service Worker: Installing');
-              event.waitUntil(
-                caches.open(CACHE_NAME)
-                  .then((cache) => {
-                    console.log('Service Worker: Opened cache');
-                    return cache.addAll(urlsToCache);
-                  })
-                  .then(() => self.skipWaiting()) // Activates the new service worker immediately
-              );
-            });
-
-            self.addEventListener('activate', (event) => {
-              console.log('Service Worker: Activating');
-              const cacheWhitelist = [CACHE_NAME];
-              event.waitUntil(
-                caches.keys().then((cacheNames) => {
-                  return Promise.all(
-                    cacheNames.map((cacheName) => {
-                      if (cacheWhitelist.indexOf(cacheName) === -1) {
-                        console.log('Service Worker: Deleting old cache', cacheName);
-                        return caches.delete(cacheName);
-                      }
-                    })
-                  );
-                }).then(() => self.clients.claim()) // Takes control of current clients
-              );
-            });
-
-            self.addEventListener('fetch', (event) => {
-              event.respondWith(
-                caches.match(event.request)
-                  .then((response) => {
-                    if (response) {
-                      return response;
-                    }
-                    return fetch(event.request).catch(() => {
-                        // Optional: Return a fallback page for offline if needed
-                        // if (event.request.mode === 'navigate') {
-                        //     return caches.match('/offline.html');
-                        // }
-                        throw new Error('Network request failed and no cache match.');
-                    });
-                  })
-              );
-            });
-        `;
-        const serviceWorkerBlob = new Blob([serviceWorkerContent], { type: 'application/javascript' });
-        const serviceWorkerUrl = URL.createObjectURL(serviceWorkerBlob);
+        
 
         // Register the Service Worker
         if ('serviceWorker' in navigator) {
@@ -1114,7 +1022,7 @@
                 // We're dynamically registering a Blob URL. In a real app, you'd register a static file path.
                 // The scope is determined by the service worker's actual URL, so for a root-level worker, it would control everything.
                 // For a Blob URL, the scope might be more restrictive or might inherit the page's scope.
-                navigator.serviceWorker.register(serviceWorkerUrl, { scope: '/' }) // Ensure scope is '/' to cover the whole app
+                 // Ensure scope is '/' to cover the whole app
                     .then(registration => {
                         console.log('Inline Service Worker registered with scope:', registration.scope);
                     })
